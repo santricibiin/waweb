@@ -7,7 +7,7 @@ export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [user, apiKeyCount, sessionCount, otpCount, otpVerified] = await Promise.all([
+  const [user, apiKeyCount, sessionCount, otpCount, otpVerified, templateCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.uid },
       select: { name: true, email: true },
@@ -16,6 +16,7 @@ export default async function DashboardPage() {
     prisma.waSession.count({ where: { userId: session.uid } }),
     prisma.otpRequest.count({ where: { userId: session.uid } }),
     prisma.otpRequest.count({ where: { userId: session.uid, status: "VERIFIED" } }),
+    prisma.messageTemplate.count({ where: { userId: session.uid } }),
   ]);
 
   const successRate = otpCount > 0 ? Math.round((otpVerified / otpCount) * 100) : 0;
@@ -38,7 +39,7 @@ export default async function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Stat label="API Keys aktif" value={apiKeyCount} href="/dashboard/api-keys" icon="key" />
         <Stat label="Sesi WhatsApp" value={sessionCount} href="/dashboard/wa-sessions" icon="wa" />
-        <Stat label="Total OTP" value={otpCount} icon="paper" />
+        <Stat label="Template pesan" value={templateCount} href="/dashboard/templates" icon="paper" />
         <Stat label="Berhasil verify" value={`${successRate}%`} icon="check" hint={`${otpVerified} / ${otpCount}`} />
       </div>
 

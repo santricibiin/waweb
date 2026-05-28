@@ -10,9 +10,45 @@ const schema = z.object({
   purpose: z.string().trim().max(60).optional(),
   length: z.number().int().min(4).max(8).optional(),
   expiresInSeconds: z.number().int().min(30).max(60 * 30).optional(),
-  template: z.string().max(500).optional(),
+  template: z.string().max(1000).optional(),
+  templateId: z.string().optional(),
   sessionId: z.string().optional(),
+  variables: z.record(z.string()).optional(),
 });
+
+/**
+ * Render a template body by substituting placeholders.
+ *
+ * Supported placeholders (case-insensitive):
+ *   {code}, {otp}                  -> the OTP code
+ *   {minutes}                      -> integer minutes of validity
+ *   {seconds}                      -> seconds of validity
+ *   {phone}                        -> recipient phone (normalized)
+ *   {purpose}                      -> purpose string (or empty)
+ *   {var:NAME}                     -> custom variable from `variables`
+ */
+function renderTemplate(
+  body: string,
+  ctx: {
+    code: string;
+    expiresInSeconds: number;
+    phone: string;
+    purpose: string;
+    variables: Record<string, string>;
+  }
+): string {
+  return body
+    .replace(/\{code\}/gi, ctx.code)
+    .replace(/\{otp\}/gi, ctx.code)
+    .replace(/\{minutes\}/gi, Math.round(ctx.expiresInSeconds / 60).toString())
+    .replace(/\{seconds\}/gi, ctx.expiresInSeconds.toString())
+    .replace(/\{phone\}/gi, ctx.phone)
+    .replace(/\{purpose\}/gi, ctx.purpose)
+    .replace(/\{var:([a-zA-Z0-9_]+)\}/gi, (_, key) => ctx.variables[key] ?? "");
+}
+
+const FALLBACK_TEMPLATE =
+  "Kode OTP Anda adalah: *{code}*\nBerlaku {minutes} menit. Jangan bagikan kode ini ke siapa pun.";
 
 export async function POST(req: NextRequest) {
   const auth = await authenticateApiKey(req);
@@ -35,10 +71,12 @@ export async function POST(req: NextRequest) {
     length = 6,
     expiresInSeconds = 300,
     template,
+    templateId,
     sessionId,
+    variables = {},
   } = parsed.data;
 
-  // Pick the WA session: explicit one, else the first connected session of the user.
+  // Pilih sesi WA
   const waSession = sessionId
     ? await prisma.waSession.findFirst({
         where: { id: sessionId, userId: auth.userId },
@@ -61,6 +99,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Pilih template body:
+  //   1. inline `template` di body request (highest priority)
+  //   2. `templateId` -> ambil dari DB
+  //   3. user's default template kalau ada
+  //   4. FALLBACK_TEMPLATE
+  let templateBody = template;
+  if (!templateBody && templateId) {
+    const t = await prisma.messageTemplate.findFirst({
+      where: { id: templateId, userId: auth.userId },
+    });
+    if (!t) return jsonError("Template not found", 404);
+    templateBody = t.body;
+  }
+  if (!templateBody) {
+    const def = await prisma.messageTemplate.findFirst({
+      where: { userId: auth.userId, isDefault: true },
+    });
+    if (def) templateBody = def.body;
+  }
+  if (!templateBody) templateBody = FALLBACK_TEMPLATE;
+
+  if (!templateBody.match(/\{code\}|\{otp\}/i)) {
+    return jsonError("Template body must contain {code} or {otp} placeholder", 400);
+  }
+
   const normalizedPhone = normalizePhone(phone);
   const code = generateOtpCode(length);
   const hashed = await hashSecret(code);
@@ -72,7 +135,7 @@ export async function POST(req: NextRequest) {
       apiKeyId: auth.apiKeyId,
       waSessionId: waSession.id,
       phone: normalizedPhone,
-      code: "", // never store the plaintext
+      code: "",
       hashedCode: hashed,
       purpose,
       expiresAt,
@@ -80,11 +143,13 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const message =
-    template?.replace(/\{code\}/gi, code).replace(/\{otp\}/gi, code) ??
-    `Kode OTP Anda adalah: *${code}*\nBerlaku ${Math.round(
-      expiresInSeconds / 60
-    )} menit. Jangan bagikan kode ini ke siapa pun.`;
+  const message = renderTemplate(templateBody, {
+    code,
+    expiresInSeconds,
+    phone: normalizedPhone,
+    purpose: purpose ?? "",
+    variables,
+  });
 
   try {
     await worker.sendMessage(waSession.id, normalizedPhone, message);

@@ -172,8 +172,22 @@ export default function DocsPage() {
                 name: "template",
                 type: "string",
                 required: false,
-                desc: "Custom template pesan WhatsApp. Gunakan {code} sebagai placeholder.",
+                desc: "Custom template pesan inline. Gunakan placeholder seperti {code}, {minutes}, dll.",
                 example: "Kode verifikasi Anda: {code}",
+              },
+              {
+                name: "templateId",
+                type: "string",
+                required: false,
+                desc: "ID template yang sudah dibuat di dashboard. Jika kedua 'template' dan 'templateId' kosong, dipakai template default user (atau fallback bawaan).",
+                example: "ck...",
+              },
+              {
+                name: "variables",
+                type: "object",
+                required: false,
+                desc: "Variabel custom untuk placeholder {var:NAMA} di template. Contoh: { \"merchant\": \"TokoXYZ\" } -> {var:merchant}.",
+                example: '{"merchant":"TokoXYZ"}',
               },
               {
                 name: "sessionId",
@@ -193,6 +207,60 @@ export default function DocsPage() {
     "purpose": "login",
     "expiresInSeconds": 300
   }'`}</pre>
+
+          <H3>Placeholder yang didukung di template</H3>
+          <div className="overflow-hidden rounded-lg border border-navy-100 bg-white shadow-soft">
+            <table className="w-full text-sm">
+              <thead className="bg-navy-50 text-left text-[11px] font-semibold uppercase tracking-wider text-navy-700">
+                <tr>
+                  <th className="px-3 py-2.5 w-40">Placeholder</th>
+                  <th className="px-3 py-2.5">Diganti dengan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["{code}", "Kode OTP yang di-generate"],
+                  ["{otp}", "Alias dari {code}"],
+                  ["{minutes}", "Menit masa berlaku (round)"],
+                  ["{seconds}", "Detik masa berlaku"],
+                  ["{phone}", "Nomor tujuan setelah dinormalisasi"],
+                  ["{purpose}", "Nilai field 'purpose' (atau kosong)"],
+                  ["{var:NAMA}", "Diambil dari field 'variables', mis. {var:merchant} -> 'TokoXYZ'"],
+                ].map(([k, v]) => (
+                  <tr key={k} className="border-t border-navy-100">
+                    <td className="px-3 py-2.5 font-mono text-xs font-semibold text-gold-700">{k}</td>
+                    <td className="px-3 py-2.5 text-navy-800">{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <H3>Contoh dengan template inline + variables</H3>
+          <pre className="codeblock">{`curl -X POST ${baseUrl}/api/v1/otp/send \\
+  -H "x-api-key: waotp_xxx_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "phone": "08123456789",
+    "purpose": "login",
+    "template": "Halo {var:nama}, kode OTP {var:merchant}: *{code}* (berlaku {minutes} menit)",
+    "variables": {
+      "nama": "Budi",
+      "merchant": "TokoXYZ"
+    }
+  }'`}</pre>
+          <p className="text-sm text-navy-700/85">
+            Hasil pesan WhatsApp:{" "}
+            <em>Halo Budi, kode OTP TokoXYZ: <strong>123456</strong> (berlaku 5 menit)</em>
+          </p>
+
+          <H3>Prioritas pemilihan template</H3>
+          <ol className="list-inside list-decimal space-y-1 rounded-lg border border-navy-100 bg-white/80 p-4 text-sm text-navy-800">
+            <li>Field <code className="code">template</code> di body request (paling tinggi)</li>
+            <li>Field <code className="code">templateId</code> -&gt; ambil dari dashboard</li>
+            <li>Template default user (yang dicentang &quot;Default&quot; di dashboard)</li>
+            <li>Fallback bawaan: <code className="code">Kode OTP Anda adalah: *{"{code}"}*\nBerlaku {"{minutes}"} menit...</code></li>
+          </ol>
 
           <H3>Response 200 OK</H3>
           <ResponseTable

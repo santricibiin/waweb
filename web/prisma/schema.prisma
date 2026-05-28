@@ -21,6 +21,7 @@ model User {
   apiKeys     ApiKey[]
   waSessions  WaSession[]
   otpRequests OtpRequest[]
+  templates   MessageTemplate[]
 }
 
 model ApiKey {
@@ -98,4 +99,18 @@ enum OtpStatus {
   VERIFIED
   EXPIRED
   FAILED
+}
+
+model MessageTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  body      String   @db.Text
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
