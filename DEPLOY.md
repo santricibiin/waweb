@@ -14,13 +14,13 @@ Tunggu 5-10 menit. Selesai → buka `https://yourdomain.com`.
 
 ## 2. Aktifkan alias
 
-Setelah deploy selesai, jalankan **sekali**:
+Setelah deploy selesai, jalankan:
 
 ```bash
-source /etc/profile.d/wa-otp-aliases.sh
+exec bash
 ```
 
-Atau tutup terminal, buka SSH baru — alias auto aktif.
+Selesai. Alias langsung aktif. Atau tutup SSH dan buka lagi — alias auto aktif setiap login baru.
 
 Cek dengan: `waotp-help`
 
@@ -32,10 +32,31 @@ waupdate
 
 Itu saja. Pull + build + restart otomatis.
 
-## 4. Cleanup (mau deploy ulang dari nol)
+## 4. Git pull manual (tanpa alias)
+
+Kalau alias belum aktif atau mau pull saja tanpa rebuild:
+
+```bash
+sudo -u waotp git -C /opt/wa-otp fetch origin
+sudo -u waotp git -C /opt/wa-otp reset --hard origin/main
+```
+
+Update lengkap manual:
+
+```bash
+sudo bash /opt/wa-otp/scripts/vps-update.sh
+```
+
+## 5. Cleanup (mau deploy ulang dari nol)
 
 ```bash
 wacleanup
+```
+
+Atau manual:
+
+```bash
+sudo bash /opt/wa-otp/scripts/cleanup.sh
 ```
 
 Lalu deploy ulang dengan command di langkah 1.
