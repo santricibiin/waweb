@@ -546,6 +546,10 @@ alias waauth="ls -la \$WAOTP_DIR/wa-worker/auth-sessions/"
 alias wassl-renew="sudo certbot renew"
 alias wassl-status="sudo certbot certificates"
 
+# === Danger zone ===
+alias wacleanup="sudo bash \$WAOTP_DIR/scripts/cleanup.sh"
+alias wanuke="sudo bash \$WAOTP_DIR/scripts/cleanup.sh --nuke"
+
 # === Help ===
 waotp-help() {
   cat <<HELP
@@ -580,6 +584,10 @@ FILES:
 SSL:
   wassl-renew         Run certbot renew
   wassl-status        Show SSL cert status
+
+CLEANUP (DANGER):
+  wacleanup           Remove app/db/services (keep system packages)
+  wanuke              Full uninstall (also removes MySQL, Nginx, etc)
 
   waotp-help          Show this help
 HELP

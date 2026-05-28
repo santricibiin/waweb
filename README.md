@@ -149,7 +149,32 @@ ulang atau jalankan `source /etc/profile.d/wa-otp-aliases.sh`, lalu pakai:
 | `warestore` | Restore dari backup (interactive picker) |
 | `waenv` | Edit `.env` dengan nano |
 | `wassl-renew` / `wassl-status` | Manage SSL cert |
+| `wacleanup` | Hapus app/db/services (paket sistem dipertahankan) |
+| `wanuke` | Full uninstall (juga hapus MySQL, Nginx, dll) |
 | `waotp-help` | Tampilkan semua alias |
+
+**Cleanup / deploy ulang dari nol:**
+
+Kalau mau bersihkan instalasi (mis. mau deploy ulang fresh):
+
+```bash
+# Cleanup standar - hapus app, db, services. Paket sistem tetap.
+sudo bash /opt/wa-otp/scripts/cleanup.sh
+
+# Skip konfirmasi
+sudo bash /opt/wa-otp/scripts/cleanup.sh --yes
+
+# Hapus juga SSL cert
+sudo bash /opt/wa-otp/scripts/cleanup.sh --remove-ssl
+
+# Hapus juga backup di /root/backups/
+sudo bash /opt/wa-otp/scripts/cleanup.sh --remove-backups
+
+# NUKE - uninstall MySQL, Nginx, Certbot, PM2, swap (Node.js TIDAK)
+sudo bash /opt/wa-otp/scripts/cleanup.sh --nuke
+```
+
+Setelah cleanup, jalankan ulang `vps-deploy.sh` untuk install fresh.
 
 **Yang otomatis dikerjakan oleh deploy script:**
 
