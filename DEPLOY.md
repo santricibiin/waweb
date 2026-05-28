@@ -17,12 +17,14 @@ Tunggu 5-10 menit. Selesai → buka `https://yourdomain.com`.
 Setelah deploy selesai, jalankan:
 
 ```bash
-exec bash
+source /etc/profile.d/wa-otp-aliases.sh
 ```
 
-Selesai. Alias langsung aktif. Atau tutup SSH dan buka lagi — alias auto aktif setiap login baru.
+Atau tutup SSH dan login ulang — alias auto aktif setiap login baru.
 
 Cek dengan: `waotp-help`
+
+Kalau command di atas error "No such file" berarti deploy belum selesai sampai step alias. Cek dengan `ls /etc/profile.d/wa-otp-aliases.sh`.
 
 ## 3. Update kalau ada commit baru
 
