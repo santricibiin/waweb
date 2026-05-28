@@ -131,6 +131,10 @@ sudo bash /opt/wa-otp/scripts/vps-update.sh
 
 **Shell aliases (otomatis ter-install):**
 
+KALO PAKE COMMAND
+
+sudo bash /opt/wa-otp/scripts/vps-update.sh
+
 Deploy script juga membuat shortcut di `/etc/profile.d/wa-otp-aliases.sh`. Login
 ulang atau jalankan `source /etc/profile.d/wa-otp-aliases.sh`, lalu pakai:
 

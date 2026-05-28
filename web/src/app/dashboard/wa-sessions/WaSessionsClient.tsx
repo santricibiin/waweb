@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Modal from "@/components/Modal";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 
 type Status = "DISCONNECTED" | "CONNECTING" | "QR" | "CONNECTED" | "LOGGED_OUT";
 
@@ -15,6 +18,7 @@ interface WaSession {
 
 interface QrInfo {
   sessionId: string;
+  sessionName: string;
   qr: string | null;
   status: Status;
 }
@@ -24,11 +28,12 @@ export default function WaSessionsClient({
 }: {
   initialSessions: WaSession[];
 }) {
+  const toast = useToast();
   const [sessions, setSessions] = useState(initialSessions);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [qrInfo, setQrInfo] = useState<QrInfo | null>(null);
+  const [removing, setRemoving] = useState<WaSession | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function startPolling(id: string) {
@@ -51,25 +56,27 @@ export default function WaSessionsClient({
       const data = await res.json();
       if (!res.ok) return;
       const w = data.worker;
-      setQrInfo({
-        sessionId: id,
-        qr: w?.qr ?? null,
-        status: (w?.status ?? data.session.status) as Status,
-      });
+      const newStatus = (w?.status ?? data.session.status) as Status;
+      setQrInfo((prev) =>
+        prev && prev.sessionId === id
+          ? { ...prev, qr: w?.qr ?? null, status: newStatus }
+          : prev
+      );
       setSessions((prev) =>
         prev.map((s) =>
           s.id === id
             ? {
                 ...s,
-                status: (data.session.status ?? s.status) as Status,
+                status: newStatus,
                 phoneNumber: data.session.phoneNumber ?? s.phoneNumber,
                 connectedAt: data.session.connectedAt ?? s.connectedAt,
               }
             : s
         )
       );
-      if ((w?.status ?? data.session.status) === "CONNECTED") {
+      if (newStatus === "CONNECTED") {
         stopPolling();
+        toast.success("WhatsApp terhubung", "Sesi siap mengirim OTP.");
       }
     } catch {
       // ignore
@@ -80,7 +87,6 @@ export default function WaSessionsClient({
     e.preventDefault();
     if (!name.trim()) return;
     setCreating(true);
-    setError(null);
     try {
       const res = await fetch("/api/dashboard/wa-sessions", {
         method: "POST",
@@ -102,40 +108,49 @@ export default function WaSessionsClient({
         ...prev,
       ]);
       setName("");
-      setQrInfo({ sessionId: s.id, qr: null, status: "CONNECTING" });
+      setQrInfo({ sessionId: s.id, sessionName: s.name, qr: null, status: "CONNECTING" });
       startPolling(s.id);
     } catch (err) {
-      setError((err as Error).message);
+      toast.error("Gagal", (err as Error).message);
     } finally {
       setCreating(false);
     }
   }
 
-  async function reconnect(id: string) {
-    setError(null);
-    setQrInfo({ sessionId: id, qr: null, status: "CONNECTING" });
+  async function reconnect(s: WaSession) {
+    setQrInfo({ sessionId: s.id, sessionName: s.name, qr: null, status: "CONNECTING" });
     try {
-      const res = await fetch(`/api/dashboard/wa-sessions/${id}/connect`, {
+      const res = await fetch(`/api/dashboard/wa-sessions/${s.id}/connect`, {
         method: "POST",
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Gagal terhubung");
       }
-      startPolling(id);
+      startPolling(s.id);
     } catch (err) {
-      setError((err as Error).message);
+      toast.error("Gagal", (err as Error).message);
       setQrInfo(null);
     }
   }
 
-  async function removeSession(id: string) {
-    if (!confirm("Hapus sesi ini? Anda perlu scan ulang jika ingin pakai lagi.")) return;
+  async function doRemove() {
+    if (!removing) return;
+    const id = removing.id;
     const res = await fetch(`/api/dashboard/wa-sessions/${id}`, { method: "DELETE" });
     if (res.ok) {
-      setSessions((prev) => prev.filter((s) => s.id !== id));
+      setSessions((prev) => prev.filter((x) => x.id !== id));
       if (qrInfo?.sessionId === id) setQrInfo(null);
+      toast.success("Sesi dihapus");
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error("Gagal hapus", data.error || "Coba lagi.");
     }
+  }
+
+  function closeQr() {
+    stopPolling();
+    setQrInfo(null);
   }
 
   return (
@@ -158,60 +173,6 @@ export default function WaSessionsClient({
           {creating ? "Membuat..." : "Tambah sesi"}
         </button>
       </form>
-
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {qrInfo && (
-        <div className="card-dark relative overflow-hidden">
-          <div className="absolute inset-0 panel-batik-dark opacity-25 pointer-events-none" />
-          <div className="relative space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="h-display text-lg font-semibold text-cream-50">
-                Hubungkan WhatsApp
-              </h3>
-              <span className="pill pill-info">{qrInfo.status}</span>
-            </div>
-            {qrInfo.status === "QR" && qrInfo.qr ? (
-              <div className="grid items-center gap-6 md:grid-cols-[auto_1fr]">
-                <div className="rounded-lg bg-white p-3 shadow-soft">
-                  {qrInfo.qr.startsWith("data:image") ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={qrInfo.qr} alt="QR Code" className="h-64 w-64" />
-                  ) : (
-                    <pre className="codeblock max-w-full break-all">{qrInfo.qr}</pre>
-                  )}
-                </div>
-                <div className="space-y-3 text-sm text-cream-100/90">
-                  <div className="font-semibold text-gold-300">Cara scan:</div>
-                  <ol className="list-inside list-decimal space-y-1.5 leading-relaxed">
-                    <li>Buka WhatsApp di HP Anda</li>
-                    <li>Settings &rarr; Linked Devices</li>
-                    <li>Tap &quot;Link a Device&quot;</li>
-                    <li>Arahkan kamera ke QR di samping</li>
-                  </ol>
-                  <p className="text-xs text-cream-100/60">
-                    QR akan refresh otomatis. Status akan berubah ke{" "}
-                    <span className="font-semibold text-emerald-300">CONNECTED</span> jika berhasil.
-                  </p>
-                </div>
-              </div>
-            ) : qrInfo.status === "CONNECTED" ? (
-              <div className="rounded-lg bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
-                ✓ Berhasil terhubung. Sesi siap mengirim OTP.
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-cream-100/70">
-                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-gold-300" />
-                Menyiapkan QR...
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="card overflow-hidden p-0">
         <table className="w-full text-sm">
@@ -241,10 +202,10 @@ export default function WaSessionsClient({
                   {s.phoneNumber || "-"}
                 </td>
                 <td className="px-4 py-3 text-right space-x-2">
-                  <button onClick={() => reconnect(s.id)} className="btn-outline">
+                  <button onClick={() => reconnect(s)} className="btn-outline">
                     Hubungkan / QR
                   </button>
-                  <button onClick={() => removeSession(s.id)} className="btn-danger">
+                  <button onClick={() => setRemoving(s)} className="btn-danger">
                     Hapus
                   </button>
                 </td>
@@ -253,6 +214,90 @@ export default function WaSessionsClient({
           </tbody>
         </table>
       </div>
+
+      {/* Modal: QR Code */}
+      <Modal
+        open={!!qrInfo}
+        onClose={closeQr}
+        size="lg"
+        title={`Hubungkan ${qrInfo?.sessionName ?? ""}`}
+        description={
+          qrInfo?.status === "CONNECTED"
+            ? "Sesi berhasil terhubung."
+            : "Scan QR code di bawah dengan WhatsApp di HP Anda."
+        }
+        variant={qrInfo?.status === "CONNECTED" ? "success" : "default"}
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-navy-700/60">
+              Status
+            </span>
+            <StatusBadge status={qrInfo?.status ?? "CONNECTING"} />
+          </div>
+
+          {qrInfo?.status === "QR" && qrInfo.qr ? (
+            <div className="grid items-center gap-6 md:grid-cols-[auto_1fr]">
+              <div className="rounded-xl border-2 border-gold-300 bg-white p-3 shadow-soft">
+                {qrInfo.qr.startsWith("data:image") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={qrInfo.qr} alt="QR Code" className="h-56 w-56" />
+                ) : (
+                  <pre className="codeblock max-w-full break-all">{qrInfo.qr}</pre>
+                )}
+              </div>
+              <div className="space-y-3 text-sm text-navy-800">
+                <div className="font-semibold text-navy-900">Cara scan:</div>
+                <ol className="list-inside list-decimal space-y-1.5 leading-relaxed">
+                  <li>Buka WhatsApp di HP</li>
+                  <li>
+                    <strong>Settings &rarr; Linked Devices</strong>
+                  </li>
+                  <li>Tap <strong>Link a Device</strong></li>
+                  <li>Arahkan kamera ke QR di samping</li>
+                </ol>
+                <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                  QR refresh otomatis setiap beberapa detik. Begitu HP terhubung,
+                  status akan jadi <strong>CONNECTED</strong>.
+                </p>
+              </div>
+            </div>
+          ) : qrInfo?.status === "CONNECTED" ? (
+            <div className="flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-4 text-emerald-900">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-8 w-8 flex-shrink-0 text-emerald-600"
+                fill="currentColor"
+              >
+                <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 14.5L6.5 12l1.4-1.4 3.1 3 6.6-6.6 1.4 1.4z" />
+              </svg>
+              <div>
+                <div className="font-semibold">Berhasil terhubung</div>
+                <div className="text-sm opacity-85">
+                  Sesi siap dipakai untuk kirim OTP.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-lg bg-navy-50 px-4 py-6 text-sm text-navy-800">
+              <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-gold-400" />
+              Menyiapkan QR... biasanya butuh 2-5 detik.
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Confirm dialog: hapus sesi */}
+      <ConfirmDialog
+        open={!!removing}
+        onClose={() => setRemoving(null)}
+        onConfirm={doRemove}
+        variant="danger"
+        title={`Hapus sesi "${removing?.name}"?`}
+        description="Sesi WhatsApp akan logout. Untuk pakai lagi, perlu scan QR ulang."
+        confirmLabel="Ya, hapus"
+        cancelLabel="Batal"
+      />
     </div>
   );
 }

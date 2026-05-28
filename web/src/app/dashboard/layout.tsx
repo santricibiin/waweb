@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { ToastProvider } from "@/components/Toast";
 
 export default async function DashboardLayout({
   children,
@@ -11,21 +12,23 @@ export default async function DashboardLayout({
   if (!session) redirect("/login");
 
   return (
-    <div className="grid gap-8 md:grid-cols-[220px_1fr]">
-      <aside className="space-y-1">
-        <div className="mb-3 px-3 text-[10px] font-bold uppercase tracking-widest text-navy-700/50">
-          Dashboard
-        </div>
-        <NavLink href="/dashboard" icon="home">Ringkasan</NavLink>
-        <NavLink href="/dashboard/wa-sessions" icon="wa">Sesi WhatsApp</NavLink>
-        <NavLink href="/dashboard/api-keys" icon="key">API Keys</NavLink>
-        <NavLink href="/dashboard/templates" icon="chat">Template Pesan</NavLink>
-        <div className="my-3 h-px bg-navy-100" />
-        <NavLink href="/docs" icon="book">Dokumentasi</NavLink>
-        <NavLink href="/demo.html" icon="play">Halaman Demo</NavLink>
-      </aside>
-      <div>{children}</div>
-    </div>
+    <ToastProvider>
+      <div className="grid gap-8 md:grid-cols-[220px_1fr]">
+        <aside className="space-y-1">
+          <div className="mb-3 px-3 text-[10px] font-bold uppercase tracking-widest text-navy-700/50">
+            Dashboard
+          </div>
+          <NavLink href="/dashboard" icon="home">Ringkasan</NavLink>
+          <NavLink href="/dashboard/wa-sessions" icon="wa">Sesi WhatsApp</NavLink>
+          <NavLink href="/dashboard/api-keys" icon="key">API Keys</NavLink>
+          <NavLink href="/dashboard/templates" icon="chat">Template Pesan</NavLink>
+          <div className="my-3 h-px bg-navy-100" />
+          <NavLink href="/docs" icon="book">Dokumentasi</NavLink>
+          <NavLink href="/demo.html" icon="play">Halaman Demo</NavLink>
+        </aside>
+        <div>{children}</div>
+      </div>
+    </ToastProvider>
   );
 }
 

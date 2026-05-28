@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 
 interface Template {
   id: string;
@@ -29,9 +31,10 @@ export default function TemplatesClient({
 }: {
   initialTemplates: Template[];
 }) {
+  const toast = useToast();
   const [templates, setTemplates] = useState(initialTemplates);
   const [editing, setEditing] = useState<Template | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Template | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -43,13 +46,11 @@ export default function TemplatesClient({
   function startCreate() {
     setEditing(null);
     setForm({ name: "", body: DEFAULT_BODY, isDefault: false });
-    setError(null);
   }
 
   function startEdit(t: Template) {
     setEditing(t);
     setForm({ name: t.name, body: t.body, isDefault: t.isDefault });
-    setError(null);
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -75,7 +76,6 @@ export default function TemplatesClient({
     e.preventDefault();
     if (!form.name.trim() || !form.body.trim()) return;
     setSaving(true);
-    setError(null);
     try {
       const url = editing
         ? `/api/dashboard/templates/${editing.id}`
@@ -93,7 +93,6 @@ export default function TemplatesClient({
         let next = editing
           ? prev.map((x) => (x.id === t.id ? t : x))
           : [t, ...prev];
-        // Sync isDefault flip kalau template ini di-set default
         if (t.isDefault) {
           next = next.map((x) => (x.id === t.id ? x : { ...x, isDefault: false }));
         }
@@ -101,14 +100,15 @@ export default function TemplatesClient({
       });
       setEditing(null);
       setForm({ name: "", body: DEFAULT_BODY, isDefault: false });
+      toast.success(editing ? "Template diperbarui" : "Template dibuat", t.name);
     } catch (err) {
-      setError((err as Error).message);
+      toast.error("Gagal", (err as Error).message);
     } finally {
       setSaving(false);
     }
   }
 
-  async function setDefault(id: string) {
+  async function setDefault(id: string, name: string) {
     try {
       const res = await fetch(`/api/dashboard/templates/${id}`, {
         method: "PATCH",
@@ -122,13 +122,15 @@ export default function TemplatesClient({
       setTemplates((prev) =>
         prev.map((x) => ({ ...x, isDefault: x.id === id }))
       );
+      toast.success("Template default diubah", name);
     } catch (err) {
-      setError((err as Error).message);
+      toast.error("Gagal", (err as Error).message);
     }
   }
 
-  async function remove(id: string) {
-    if (!confirm("Hapus template ini? Tidak bisa dibatalkan.")) return;
+  async function doDelete() {
+    if (!deleting) return;
+    const id = deleting.id;
     const res = await fetch(`/api/dashboard/templates/${id}`, { method: "DELETE" });
     if (res.ok) {
       setTemplates((prev) => prev.filter((x) => x.id !== id));
@@ -136,6 +138,10 @@ export default function TemplatesClient({
         setEditing(null);
         setForm({ name: "", body: DEFAULT_BODY, isDefault: false });
       }
+      toast.success("Template dihapus", deleting.name);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error("Gagal hapus", data.error || "Coba lagi.");
     }
   }
 
@@ -219,12 +225,6 @@ export default function TemplatesClient({
           Jadikan template default (dipakai jika API call tidak menentukan template)
         </label>
 
-        {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving} className="btn-primary">
             {saving ? "Menyimpan..." : editing ? "Simpan perubahan" : "Buat template"}
@@ -290,14 +290,14 @@ export default function TemplatesClient({
                   </button>
                   {!t.isDefault && (
                     <button
-                      onClick={() => setDefault(t.id)}
+                      onClick={() => setDefault(t.id, t.name)}
                       className="btn-outline text-xs"
                     >
                       Jadikan default
                     </button>
                   )}
                   <button
-                    onClick={() => remove(t.id)}
+                    onClick={() => setDeleting(t)}
                     className="btn-danger text-xs"
                   >
                     Hapus
@@ -308,6 +308,17 @@ export default function TemplatesClient({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={doDelete}
+        variant="danger"
+        title={`Hapus template "${deleting?.name}"?`}
+        description="Template akan hilang permanen. Aplikasi yang masih merefer ke template ID ini akan jatuh ke template default atau fallback."
+        confirmLabel="Ya, hapus"
+        cancelLabel="Batal"
+      />
     </div>
   );
 }

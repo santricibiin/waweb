@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Modal from "@/components/Modal";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 
 interface ApiKey {
   id: string;
@@ -12,18 +15,18 @@ interface ApiKey {
 }
 
 export default function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }) {
+  const toast = useToast();
   const [keys, setKeys] = useState(initialKeys);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState<{ id: string; key: string } | null>(null);
+  const [revealed, setRevealed] = useState<{ id: string; key: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [revoking, setRevoking] = useState<ApiKey | null>(null);
 
   async function createKey(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     setCreating(true);
-    setError(null);
     try {
       const res = await fetch("/api/dashboard/api-keys", {
         method: "POST",
@@ -32,7 +35,7 @@ export default function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal membuat key");
-      setRevealed({ id: data.apiKey.id, key: data.apiKey.key });
+      setRevealed({ id: data.apiKey.id, key: data.apiKey.key, name: data.apiKey.name });
       setKeys((prev) => [
         {
           id: data.apiKey.id,
@@ -45,27 +48,38 @@ export default function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }
         ...prev,
       ]);
       setName("");
+      toast.success("API key dibuat", "Salin sekarang sebelum hilang!");
     } catch (err) {
-      setError((err as Error).message);
+      toast.error("Gagal membuat key", (err as Error).message);
     } finally {
       setCreating(false);
     }
   }
 
-  async function revokeKey(id: string) {
-    if (!confirm("Cabut API key ini? Tindakan ini tidak bisa dibatalkan.")) return;
+  async function doRevoke() {
+    if (!revoking) return;
+    const id = revoking.id;
     const res = await fetch(`/api/dashboard/api-keys/${id}`, { method: "DELETE" });
     if (res.ok) {
       setKeys((prev) =>
         prev.map((k) => (k.id === id ? { ...k, revokedAt: new Date().toISOString() } : k))
       );
+      toast.success("Key dicabut", `${revoking.name} tidak bisa dipakai lagi.`);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      toast.error("Gagal cabut", data.error || "Coba lagi.");
     }
   }
 
   async function copy(text: string) {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Tersalin ke clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Gagal menyalin", "Salin manual dari kolom di atas.");
+    }
   }
 
   return (
@@ -85,33 +99,6 @@ export default function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }
           {creating ? "Membuat..." : "Buat key"}
         </button>
       </form>
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {revealed && (
-        <div className="rounded-xl border-2 border-gold-300 bg-gold-50/60 p-5 shadow-soft">
-          <div className="flex items-center gap-2 text-sm font-semibold text-gold-800">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-              <path d="M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-7h-2v5h2V9z" />
-            </svg>
-            Salin key Anda sekarang. Key tidak akan ditampilkan lagi.
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-md border border-gold-200 bg-white px-3 py-2.5 font-mono text-xs text-navy-900">
-              {revealed.key}
-            </code>
-            <button onClick={() => copy(revealed.key)} className="btn-gold">
-              {copied ? "Tersalin" : "Salin"}
-            </button>
-            <button onClick={() => setRevealed(null)} className="btn-ghost">
-              Tutup
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="card overflow-hidden p-0">
         <table className="w-full text-sm">
@@ -150,7 +137,7 @@ export default function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }
                 </td>
                 <td className="px-4 py-3 text-right">
                   {!k.revokedAt && (
-                    <button onClick={() => revokeKey(k.id)} className="btn-danger">
+                    <button onClick={() => setRevoking(k)} className="btn-danger">
                       Cabut
                     </button>
                   )}
@@ -160,6 +147,70 @@ export default function ApiKeysClient({ initialKeys }: { initialKeys: ApiKey[] }
           </tbody>
         </table>
       </div>
+
+      {/* Modal: API key reveal */}
+      <Modal
+        open={!!revealed}
+        onClose={() => setRevealed(null)}
+        size="lg"
+        variant="warn"
+        title="API key dibuat"
+        description="Ini satu-satunya kesempatan untuk menyalin key ini. Setelah ditutup, key tidak akan ditampilkan lagi."
+        footer={
+          <>
+            <button onClick={() => copy(revealed?.key ?? "")} className="btn-gold">
+              {copied ? "Tersalin" : "Salin key"}
+            </button>
+            <button onClick={() => setRevealed(null)} className="btn-primary">
+              Sudah disimpan, tutup
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-navy-700">
+              Nama key
+            </div>
+            <div className="text-sm text-navy-900">{revealed?.name}</div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-navy-700">
+              Key (gunakan di header <code className="code">x-api-key</code>)
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border border-gold-300 bg-cream-50 px-3 py-3 shadow-soft">
+              <code className="flex-1 break-all font-mono text-xs text-navy-900">
+                {revealed?.key}
+              </code>
+              <button
+                onClick={() => copy(revealed?.key ?? "")}
+                className="btn-ghost flex-shrink-0 text-xs"
+              >
+                {copied ? "OK" : "Salin"}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+            <strong>Tips keamanan:</strong> Simpan di environment variable aplikasi
+            (mis. <code className="code">.env</code>). Jangan hardcode di source
+            code yang di-commit ke git.
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirm dialog: revoke */}
+      <ConfirmDialog
+        open={!!revoking}
+        onClose={() => setRevoking(null)}
+        onConfirm={doRevoke}
+        variant="danger"
+        title={`Cabut "${revoking?.name}"?`}
+        description="Aplikasi yang masih pakai key ini akan langsung tidak bisa kirim OTP. Tindakan ini tidak bisa dibatalkan."
+        confirmLabel="Ya, cabut sekarang"
+        cancelLabel="Batal"
+      />
     </div>
   );
 }
