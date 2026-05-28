@@ -98,16 +98,18 @@ worker token), Prisma migrate, build, dan jalanin web + worker via PM2.
 
 **Setup pertama kali:**
 
+curl -fsSL https://raw.githubusercontent.com/santricibiin/waweb/main/scripts/vps-deploy.sh | sudo bash -s -- --domain=jagopay.biz.id --email=muhfaiqyah@gmail.com --repo=https://github.com/santricibiin/waweb.git
+
 ```bash
 # 1. Pastikan domain sudah pointing ke IP VPS (A record)
 # 2. SSH ke VPS sebagai root atau user dengan sudo
 # 3. Jalankan (ganti dengan domain & email Anda):
 
-curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/main/scripts/vps-deploy.sh | \
+curl -fsSL https://raw.githubusercontent.com/santricibiin/waweb/main/scripts/vps-deploy.sh | \
   sudo bash -s -- \
-    --domain=otp.example.com \
-    --email=admin@example.com \
-    --repo=https://github.com/<user>/<repo>.git
+    --domain=jagopay.biz.id \
+    --email=muhfaiqyah@gmail.com \
+    --repo=https://github.com/santricibiin/waweb.git
 ```
 
 **Argumen yang tersedia:**
@@ -126,6 +128,28 @@ curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/main/scripts/vps-depl
 ```bash
 sudo bash /opt/wa-otp/scripts/vps-update.sh
 ```
+
+**Shell aliases (otomatis ter-install):**
+
+Deploy script juga membuat shortcut di `/etc/profile.d/wa-otp-aliases.sh`. Login
+ulang atau jalankan `source /etc/profile.d/wa-otp-aliases.sh`, lalu pakai:
+
+| Alias | Aksi |
+|---|---|
+| `waupdate` | Pull + install + migrate + build + restart (full update) |
+| `wapull` | Pull code saja, tanpa rebuild |
+| `wastatus` | PM2 status (web + worker) |
+| `warestart` | Restart kedua service |
+| `walogs` | Tail logs (last 100) |
+| `walogs-web` / `walogs-worker` | Logs satu service |
+| `wadb` | Login MySQL sebagai user app |
+| `waroot` | Login MySQL sebagai root |
+| `wabackup` | Buat backup DB ke `/root/backups/` |
+| `wabackups` | List backup |
+| `warestore` | Restore dari backup (interactive picker) |
+| `waenv` | Edit `.env` dengan nano |
+| `wassl-renew` / `wassl-status` | Manage SSL cert |
+| `waotp-help` | Tampilkan semua alias |
 
 **Yang otomatis dikerjakan oleh deploy script:**
 
