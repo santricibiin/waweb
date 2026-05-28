@@ -548,7 +548,7 @@ alias wassl-status="sudo certbot certificates"
 
 # === Danger zone ===
 alias wacleanup="sudo bash \$WAOTP_DIR/scripts/cleanup.sh"
-alias wanuke="sudo bash \$WAOTP_DIR/scripts/cleanup.sh --nuke"
+alias wacleanup-hard="sudo bash \$WAOTP_DIR/scripts/cleanup.sh --hard"
 
 # === Help ===
 waotp-help() {
@@ -586,8 +586,8 @@ SSL:
   wassl-status        Show SSL cert status
 
 CLEANUP (DANGER):
-  wacleanup           Remove app/db/services (keep system packages)
-  wanuke              Full uninstall (also removes MySQL, Nginx, etc)
+  wacleanup           Cleanup standar (paket sistem dipertahankan)
+  wacleanup-hard      Cleanup + hapus user + revoke SSL
 
   waotp-help          Show this help
 HELP

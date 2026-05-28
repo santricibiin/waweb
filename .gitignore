@@ -40,3 +40,4 @@ Thumbs.db
 
 # Reference (not part of project)
 /vps-deploy.sh
+/cleanup-vps.sh

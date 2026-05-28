@@ -1,253 +1,270 @@
 #!/usr/bin/env bash
 # =================================================================
-# WA OTP Platform - VPS Cleanup Script
+# WA OTP Platform - VPS Full Cleanup Script
 # =================================================================
-# Bersihkan instalasi WA OTP Platform untuk deploy ulang dari nol.
+#
+# Hapus semua artifact WA OTP dari VPS supaya bisa deploy fresh.
 #
 # Yang dihapus:
-#   - PM2 services (wa-otp-web, wa-otp-worker)
-#   - PM2 startup systemd entry
-#   - User waotp + home directory
-#   - App folder /opt/wa-otp
-#   - MySQL database wa_otp + user waotp
-#   - DB password file /root/.wa-otp-db-password
-#   - Nginx config /etc/nginx/sites-{available,enabled}/wa-otp
-#   - SSL cert (optional, dengan flag)
+#   - PM2 process + daemon (web + worker)
+#   - Folder /opt/wa-otp
+#   - User waotp (opsional via flag)
+#   - Database MySQL `wa_otp` + user
+#   - File password DB
+#   - Nginx config
+#   - SSL certificate (kalau ada via Certbot)
 #   - Aliases /etc/profile.d/wa-otp-aliases.sh
 #
-# Yang TIDAK dihapus (kecuali pakai flag tertentu):
-#   - Paket sistem (Node, MySQL, Nginx, Certbot, PM2) - tetap terpasang
-#   - Backup di /root/backups/
+# YANG TIDAK DIHAPUS (supaya cepat redeploy):
+#   - Node.js, MySQL server, Nginx, PM2, Certbot binaries
 #   - Swap file
-#   - Firewall rules
+#   - UFW firewall rules
+#   - Backup di /root/backups/
 #
 # Cara pakai:
-#   sudo bash cleanup.sh                       # cleanup standar
-#   sudo bash cleanup.sh --yes                 # skip konfirmasi
-#   sudo bash cleanup.sh --remove-ssl          # hapus juga SSL cert
-#   sudo bash cleanup.sh --remove-backups      # hapus juga /root/backups/
-#   sudo bash cleanup.sh --nuke                # SEMUA: + uninstall MySQL, swap, dll
+#   sudo bash cleanup.sh
+#   sudo bash cleanup.sh --remove-user      (juga hapus user waotp)
+#   sudo bash cleanup.sh --remove-ssl       (juga revoke SSL cert)
+#   sudo bash cleanup.sh --domain=DOMAIN    (untuk SSL & nginx domain spesifik)
+#   sudo bash cleanup.sh --hard             (full nuke: user + ssl)
+#   sudo bash cleanup.sh --yes              (skip konfirmasi)
 # =================================================================
 set -euo pipefail
 
-YES=0
+REMOVE_USER=0
 REMOVE_SSL=0
-REMOVE_BACKUPS=0
-NUKE=0
+DOMAIN=""
+YES=0
 
 for arg in "$@"; do
   case $arg in
-    --yes|-y)         YES=1 ;;
-    --remove-ssl)     REMOVE_SSL=1 ;;
-    --remove-backups) REMOVE_BACKUPS=1 ;;
-    --nuke)           NUKE=1; REMOVE_SSL=1; REMOVE_BACKUPS=1 ;;
+    --remove-user)  REMOVE_USER=1 ;;
+    --remove-ssl)   REMOVE_SSL=1 ;;
+    --domain=*)     DOMAIN="${arg#*=}" ;;
+    --hard)         REMOVE_USER=1; REMOVE_SSL=1 ;;
+    --yes|-y)       YES=1 ;;
     *) echo "Unknown argument: $arg"; exit 1 ;;
   esac
 done
+
+[[ $EUID -ne 0 ]] && { echo "ERROR: Harus run dengan sudo (root)."; exit 1; }
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; BLUE='\033[0;34m'; NC='\033[0m'
 log()  { echo -e "${BLUE}[$(date +%H:%M:%S)]${NC} $1"; }
 ok()   { echo -e "${GREEN}OK${NC} $1"; }
 warn() { echo -e "${YELLOW}WARN${NC} $1"; }
-err()  { echo -e "${RED}ERR${NC} $1"; exit 1; }
 step() { echo -e "\n${BLUE}=== $1 ===${NC}"; }
-
-[[ $EUID -ne 0 ]] && err "Harus run dengan sudo (root)."
 
 APP_DIR="/opt/wa-otp"
 APP_USER="waotp"
+APP_NAME="wa-otp"
 DB_NAME="wa_otp"
 DB_USER="waotp"
 DB_PASS_FILE="/root/.wa-otp-db-password"
 ALIAS_FILE="/etc/profile.d/wa-otp-aliases.sh"
-NGINX_AVAIL="/etc/nginx/sites-available/wa-otp"
-NGINX_ENABL="/etc/nginx/sites-enabled/wa-otp"
-BACKUP_DIR="/root/backups"
+NGINX_AVAIL="/etc/nginx/sites-available/${APP_NAME}"
+NGINX_ENABLED="/etc/nginx/sites-enabled/${APP_NAME}"
+WEB_PORT=3001
+WORKER_PORT=4001
 
-# Detect domain from existing Nginx config (untuk SSL cleanup)
-DOMAIN=""
-if [[ -f "$NGINX_AVAIL" ]]; then
+# Auto-detect domain from existing Nginx config kalau tidak dikasih
+if [[ -z "$DOMAIN" && -f "$NGINX_AVAIL" ]]; then
   DOMAIN=$(grep -oP 'server_name \K[^;]+' "$NGINX_AVAIL" | head -1 | awk '{print $1}')
 fi
 
-# ============================================================
-# Confirmation
-# ============================================================
 echo -e "${YELLOW}================================================================${NC}"
-echo -e "${YELLOW}  WA OTP PLATFORM - CLEANUP${NC}"
+echo -e "${YELLOW}  WA OTP VPS Cleanup${NC}"
 echo -e "${YELLOW}================================================================${NC}"
 echo ""
-echo "Yang akan dihapus:"
-echo "  [x] PM2 services: wa-otp-web, wa-otp-worker"
-echo "  [x] User: $APP_USER (+ home dir)"
-echo "  [x] App folder: $APP_DIR"
-echo "  [x] MySQL DB: $DB_NAME + user $DB_USER"
-echo "  [x] DB password file: $DB_PASS_FILE"
-echo "  [x] Nginx config: $NGINX_AVAIL"
-echo "  [x] Aliases: $ALIAS_FILE"
-[[ $REMOVE_SSL -eq 1 ]]     && echo "  [x] SSL certificate ${DOMAIN:+for $DOMAIN}"
-[[ $REMOVE_BACKUPS -eq 1 ]] && echo "  [x] Backup folder: $BACKUP_DIR"
-[[ $NUKE -eq 1 ]] && {
-  echo "  [x] (NUKE) MySQL Server (uninstall)"
-  echo "  [x] (NUKE) Nginx (uninstall)"
-  echo "  [x] (NUKE) Certbot (uninstall)"
-  echo "  [x] (NUKE) PM2 (uninstall global)"
-  echo "  [x] (NUKE) Swap file"
-}
+echo -e "  Folder $APP_DIR              : ${RED}akan dihapus${NC}"
+echo -e "  Database $DB_NAME              : ${RED}akan di-DROP${NC}"
+echo -e "  PM2 process wa-otp-web/worker : ${RED}akan dihapus${NC}"
+echo -e "  Nginx config                  : ${RED}akan dihapus${NC}"
+echo -e "  Aliases                       : ${RED}akan dihapus${NC}"
+[[ $REMOVE_USER -eq 1 ]] && echo -e "  User $APP_USER                    : ${RED}akan dihapus${NC}"
+[[ $REMOVE_SSL -eq 1 ]] && [[ -n "$DOMAIN" ]] && echo -e "  SSL cert $DOMAIN              : ${RED}akan revoke${NC}"
 echo ""
-echo "Yang DIPERTAHANKAN:"
-[[ $NUKE -eq 0 ]] && echo "  [v] Paket sistem (Node, MySQL, Nginx, Certbot, PM2)"
-[[ $REMOVE_BACKUPS -eq 0 ]] && echo "  [v] Backup di $BACKUP_DIR"
-[[ $REMOVE_SSL -eq 0 ]] && [[ -n "$DOMAIN" ]] && echo "  [v] SSL cert untuk $DOMAIN"
+echo -e "  ${GREEN}Tetap aman:${NC} Node.js, MySQL, Nginx, Certbot, PM2 (binaries)"
+echo -e "  ${GREEN}Tetap aman:${NC} /root/backups/ (file backup)"
 echo ""
 
 if [[ $YES -eq 0 ]]; then
-  read -rp "Lanjutkan? Ketik 'yes' untuk konfirmasi: " CONFIRM
-  [[ "$CONFIRM" != "yes" ]] && { warn "Dibatalkan."; exit 0; }
+  echo -ne "${YELLOW}Lanjut? (ketik 'yes' untuk konfirmasi): ${NC}"
+  read -r CONFIRM
+  [[ "$CONFIRM" != "yes" ]] && { echo "Cancelled."; exit 0; }
 fi
 
 # ============================================================
-# 1. Stop PM2 services
+# 1. Stop & remove PM2 (NUCLEAR - kill semua proses node/next/pm2)
 # ============================================================
-step "1 - Stop PM2 services"
+step "1/6 - Stop PM2 process & free ports"
+
+# 1a. Stop PM2 daemon root + user (kalau ada)
+pm2 kill 2>/dev/null || true
 if id "$APP_USER" >/dev/null 2>&1; then
-  sudo -u "$APP_USER" pm2 delete wa-otp-web 2>/dev/null && ok "Stopped wa-otp-web" || true
-  sudo -u "$APP_USER" pm2 delete wa-otp-worker 2>/dev/null && ok "Stopped wa-otp-worker" || true
-  sudo -u "$APP_USER" pm2 save 2>/dev/null || true
-  sudo -u "$APP_USER" pm2 kill 2>/dev/null || true
-  ok "PM2 daemon killed"
+  sudo -u $APP_USER pm2 delete wa-otp-web 2>/dev/null || true
+  sudo -u $APP_USER pm2 delete wa-otp-worker 2>/dev/null || true
+  sudo -u $APP_USER pm2 save 2>/dev/null || true
+  sudo -u $APP_USER pm2 kill 2>/dev/null || true
 fi
 
-# Disable systemd auto-start
-if systemctl list-unit-files 2>/dev/null | grep -q "pm2-${APP_USER}"; then
-  systemctl disable "pm2-${APP_USER}" >/dev/null 2>&1 || true
-  systemctl stop "pm2-${APP_USER}" >/dev/null 2>&1 || true
-  rm -f /etc/systemd/system/pm2-${APP_USER}.service
-  systemctl daemon-reload
-  ok "Disabled pm2-${APP_USER}.service"
+# 1b. Force-kill SEMUA proses Next.js / worker / PM2 yang masih hidup
+pkill -9 -f "next start" 2>/dev/null || true
+pkill -9 -f "next-server" 2>/dev/null || true
+pkill -9 -f "PM2" 2>/dev/null || true
+pkill -9 -f "/opt/wa-otp" 2>/dev/null || true
+pkill -9 -f "wa-worker" 2>/dev/null || true
+if id "$APP_USER" >/dev/null 2>&1; then
+  pkill -9 -u "$APP_USER" 2>/dev/null || true
 fi
 
-# ============================================================
-# 2. Remove Nginx config
-# ============================================================
-step "2 - Remove Nginx config"
-[[ -L "$NGINX_ENABL" ]] && rm -f "$NGINX_ENABL" && ok "Removed $NGINX_ENABL"
-[[ -f "$NGINX_AVAIL" ]] && rm -f "$NGINX_AVAIL" && ok "Removed $NGINX_AVAIL"
-if command -v nginx >/dev/null && systemctl is-active nginx >/dev/null 2>&1; then
-  nginx -t >/dev/null 2>&1 && systemctl reload nginx && ok "Nginx reloaded" || warn "Nginx config still has errors"
+# 1c. Force release ports (apapun yg pakai)
+fuser -k ${WEB_PORT}/tcp 2>/dev/null || true
+fuser -k ${WORKER_PORT}/tcp 2>/dev/null || true
+
+sleep 2
+
+# 1d. Verifikasi port free
+if command -v lsof >/dev/null && lsof -i :${WEB_PORT} >/dev/null 2>&1; then
+  warn "Port ${WEB_PORT} MASIH dipakai. Cek manual: sudo lsof -i :${WEB_PORT}"
+else
+  ok "Port ${WEB_PORT} freed"
+fi
+if command -v lsof >/dev/null && lsof -i :${WORKER_PORT} >/dev/null 2>&1; then
+  warn "Port ${WORKER_PORT} MASIH dipakai. Cek manual: sudo lsof -i :${WORKER_PORT}"
+else
+  ok "Port ${WORKER_PORT} freed"
 fi
 
-# ============================================================
-# 3. Remove SSL certificate (optional)
-# ============================================================
-if [[ $REMOVE_SSL -eq 1 ]] && [[ -n "$DOMAIN" ]] && command -v certbot >/dev/null; then
-  step "3 - Remove SSL certificate"
-  certbot delete --cert-name "$DOMAIN" --non-interactive 2>/dev/null && \
-    ok "Removed cert for $DOMAIN" || warn "Cert untuk $DOMAIN tidak ditemukan/sudah hilang"
-fi
+# 1e. Disable systemd auto-start
+systemctl disable pm2-$APP_USER 2>/dev/null || true
+systemctl stop pm2-$APP_USER 2>/dev/null || true
+rm -f /etc/systemd/system/pm2-$APP_USER.service 2>/dev/null || true
+systemctl daemon-reload 2>/dev/null || true
+ok "PM2 daemon stopped, processes killed"
 
 # ============================================================
-# 4. Drop MySQL database & user
+# 2. Hapus folder app + cache
 # ============================================================
-step "4 - Drop MySQL database"
-if command -v mysql >/dev/null && systemctl is-active mysql >/dev/null 2>&1; then
-  mysql -u root <<SQL >/dev/null 2>&1 || warn "MySQL drop sebagian gagal (mungkin sudah tidak ada)"
-DROP DATABASE IF EXISTS \`$DB_NAME\`;
-DROP USER IF EXISTS '$DB_USER'@'localhost';
-FLUSH PRIVILEGES;
-SQL
-  ok "Dropped database $DB_NAME and user $DB_USER"
-fi
+step "2/6 - Remove app directory & user cache"
 
-# ============================================================
-# 5. Remove app folder
-# ============================================================
-step "5 - Remove app folder"
 if [[ -d "$APP_DIR" ]]; then
   rm -rf "$APP_DIR"
   ok "Removed $APP_DIR"
+else
+  warn "$APP_DIR tidak ada (sudah bersih)"
+fi
+
+# Hapus PM2 home + cache user (kalau home masih ada)
+if [[ -d "/home/$APP_USER/.pm2" ]]; then
+  rm -rf /home/$APP_USER/.pm2
+  ok "Removed /home/$APP_USER/.pm2"
+fi
+if [[ -d "/home/$APP_USER/.npm" ]]; then
+  rm -rf /home/$APP_USER/.npm
+  ok "Removed /home/$APP_USER/.npm"
+fi
+if [[ -d "/home/$APP_USER/.cache" ]]; then
+  rm -rf /home/$APP_USER/.cache
+  ok "Removed /home/$APP_USER/.cache"
+fi
+if [[ -f "/home/$APP_USER/.git-credentials" ]]; then
+  rm -f /home/$APP_USER/.git-credentials
+  ok "Removed /home/$APP_USER/.git-credentials"
 fi
 
 # ============================================================
-# 6. Remove user
+# 3. Drop MySQL database & user
 # ============================================================
-step "6 - Remove user $APP_USER"
-if id "$APP_USER" >/dev/null 2>&1; then
-  # Kill all processes owned by user first (sometimes pm2 daemon stays)
-  pkill -u "$APP_USER" 2>/dev/null || true
-  sleep 1
-  userdel -r "$APP_USER" 2>/dev/null && ok "Removed user $APP_USER (+ home)" || {
-    # Force remove if userdel fails (process holding files)
-    userdel "$APP_USER" 2>/dev/null || true
-    rm -rf "/home/$APP_USER" 2>/dev/null || true
-    ok "Removed user $APP_USER (forced)"
-  }
+step "3/6 - Drop MySQL database & user"
+
+if command -v mysql >/dev/null 2>&1; then
+  mysql -u root <<SQL 2>/dev/null || true
+DROP DATABASE IF EXISTS \`$DB_NAME\`;
+DROP USER IF EXISTS '$DB_USER'@'localhost';
+DROP USER IF EXISTS '$DB_USER'@'%';
+FLUSH PRIVILEGES;
+SQL
+  ok "Database '$DB_NAME' dropped"
+  ok "User '$DB_USER' dropped"
+else
+  warn "MySQL gak ada"
 fi
 
-# ============================================================
-# 7. Remove other files
-# ============================================================
-step "7 - Remove config files"
+# Hapus file password
 [[ -f "$DB_PASS_FILE" ]] && rm -f "$DB_PASS_FILE" && ok "Removed $DB_PASS_FILE"
-[[ -f "$ALIAS_FILE" ]]   && rm -f "$ALIAS_FILE"   && ok "Removed $ALIAS_FILE"
 
-if [[ $REMOVE_BACKUPS -eq 1 ]] && [[ -d "$BACKUP_DIR" ]]; then
-  COUNT=$(ls -1 "$BACKUP_DIR"/wa-otp-*.sql.gz 2>/dev/null | wc -l)
-  rm -f "$BACKUP_DIR"/wa-otp-*.sql.gz "$BACKUP_DIR"/pre-restore-*.sql.gz 2>/dev/null
-  ok "Removed $COUNT backup file(s) from $BACKUP_DIR"
-  rmdir "$BACKUP_DIR" 2>/dev/null || true  # remove dir kalau kosong
+# ============================================================
+# 4. Hapus Nginx config + Aliases
+# ============================================================
+step "4/6 - Remove Nginx config & aliases"
+
+if [[ -L "$NGINX_ENABLED" ]] || [[ -f "$NGINX_ENABLED" ]]; then
+  rm -f "$NGINX_ENABLED"
+  ok "Removed $NGINX_ENABLED"
+fi
+if [[ -f "$NGINX_AVAIL" ]]; then
+  rm -f "$NGINX_AVAIL"
+  ok "Removed $NGINX_AVAIL"
+fi
+
+# Reload Nginx kalau service jalan
+if systemctl is-active --quiet nginx 2>/dev/null; then
+  if nginx -t 2>/dev/null; then
+    systemctl reload nginx 2>/dev/null || true
+    ok "Nginx reloaded"
+  else
+    warn "Nginx config invalid setelah cleanup. Cek manual: sudo nginx -t"
+  fi
+fi
+
+# Hapus aliases
+if [[ -f "$ALIAS_FILE" ]]; then
+  rm -f "$ALIAS_FILE"
+  ok "Removed $ALIAS_FILE"
 fi
 
 # ============================================================
-# 8. (NUKE) Uninstall system packages & swap
+# 5. Revoke SSL (opsional)
 # ============================================================
-if [[ $NUKE -eq 1 ]]; then
-  step "8 - NUKE: Uninstall system packages"
+if [[ $REMOVE_SSL -eq 1 ]]; then
+  step "5/6 - Revoke SSL certificate"
 
-  warn "Mode NUKE - menghapus paket sistem juga"
-
-  # PM2 (global npm)
-  if command -v pm2 >/dev/null; then
-    npm uninstall -g pm2 >/dev/null 2>&1 || true
-    ok "Uninstalled PM2"
+  if command -v certbot >/dev/null 2>&1; then
+    if [[ -n "$DOMAIN" ]]; then
+      certbot delete --cert-name "$DOMAIN" --non-interactive 2>/dev/null || true
+      ok "Revoked SSL untuk $DOMAIN"
+    else
+      warn "Domain tidak terdeteksi - skip. Pakai --domain=DOMAIN untuk revoke spesifik."
+    fi
+  else
+    warn "Certbot gak ada"
   fi
+else
+  step "5/6 - Skip SSL revoke (pakai --remove-ssl untuk revoke)"
+fi
 
-  # MySQL
-  if command -v mysql >/dev/null; then
-    systemctl stop mysql 2>/dev/null || true
-    apt-get purge -y -qq mysql-server mysql-client mysql-common 'mysql-server-*' 'mysql-client-*' 2>/dev/null || true
-    apt-get autoremove -y -qq 2>/dev/null
-    rm -rf /var/lib/mysql /etc/mysql /var/log/mysql 2>/dev/null || true
-    ok "Uninstalled MySQL"
+# ============================================================
+# 6. Hapus user waotp (opsional)
+# ============================================================
+if [[ $REMOVE_USER -eq 1 ]]; then
+  step "6/6 - Remove user $APP_USER"
+
+  if id "$APP_USER" >/dev/null 2>&1; then
+    # Kill semua proses milik user
+    pkill -u "$APP_USER" 2>/dev/null || true
+    sleep 1
+    pkill -9 -u "$APP_USER" 2>/dev/null || true
+
+    # Hapus user + home
+    userdel -r "$APP_USER" 2>/dev/null || userdel "$APP_USER" 2>/dev/null || true
+    [[ -d "/home/$APP_USER" ]] && rm -rf "/home/$APP_USER"
+    ok "User $APP_USER removed"
+  else
+    warn "User $APP_USER tidak ada"
   fi
-
-  # Nginx
-  if command -v nginx >/dev/null; then
-    systemctl stop nginx 2>/dev/null || true
-    apt-get purge -y -qq nginx nginx-common nginx-core 2>/dev/null || true
-    apt-get autoremove -y -qq 2>/dev/null
-    rm -rf /etc/nginx 2>/dev/null || true
-    ok "Uninstalled Nginx"
-  fi
-
-  # Certbot
-  if command -v certbot >/dev/null; then
-    apt-get purge -y -qq certbot python3-certbot-nginx 2>/dev/null || true
-    rm -rf /etc/letsencrypt /var/lib/letsencrypt 2>/dev/null || true
-    ok "Uninstalled Certbot + LetsEncrypt data"
-  fi
-
-  # Swap
-  if [[ -f /swapfile ]]; then
-    swapoff /swapfile 2>/dev/null || true
-    rm -f /swapfile
-    sed -i '/\/swapfile/d' /etc/fstab
-    ok "Removed swap file"
-  fi
-
-  # NOTE: Node.js sengaja TIDAK diuninstall karena mungkin dipakai aplikasi lain
-  warn "Node.js TIDAK diuninstall (mungkin dipakai aplikasi lain). Hapus manual jika perlu:"
-  warn "  sudo apt-get purge -y nodejs && sudo rm -rf /etc/apt/sources.list.d/nodesource.list"
+else
+  step "6/6 - Skip user removal (pakai --remove-user kalau mau hapus)"
 fi
 
 # ============================================================
@@ -258,10 +275,28 @@ echo -e "${GREEN}===============================================================
 echo -e "${GREEN}  CLEANUP SELESAI${NC}"
 echo -e "${GREEN}================================================================${NC}"
 echo ""
-echo -e "  Untuk deploy ulang dari nol:"
-echo -e "    ${BLUE}curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/main/scripts/vps-deploy.sh | \\${NC}"
-echo -e "    ${BLUE}  sudo bash -s -- --domain=DOMAIN --email=EMAIL --repo=REPO_URL${NC}"
+echo -e "${YELLOW}Verifikasi:${NC}"
+echo -e "  ls $APP_DIR                              -> harus 'No such file'"
+[[ $REMOVE_USER -eq 1 ]] && echo -e "  ls /home/$APP_USER                       -> harus 'No such file'"
+[[ $REMOVE_USER -eq 0 ]] && echo -e "  ls /home/$APP_USER/.pm2                  -> harus 'No such file'"
+echo -e "  mysql -u root -e 'SHOW DATABASES'        -> tidak ada '$DB_NAME'"
+echo -e "  curl http://127.0.0.1:${WEB_PORT}        -> connection refused"
 echo ""
-[[ $NUKE -eq 0 ]] && echo -e "  ${YELLOW}Catatan:${NC} Paket sistem (Node, MySQL, Nginx, Certbot, PM2) masih terpasang."
-[[ $NUKE -eq 0 ]] && echo -e "  Deploy ulang akan re-use paket-paket ini (lebih cepat)."
+
+# Info backup folder (kalau ada)
+if [[ -d "/root/backups" ]]; then
+  BACKUP_COUNT=$(ls -1 /root/backups/wa-otp-*.sql.gz 2>/dev/null | wc -l)
+  if [[ $BACKUP_COUNT -gt 0 ]]; then
+    echo -e "${GREEN}BACKUP DATABASE LAMA TETAP AMAN${NC}"
+    echo -e "  Folder       : /root/backups ($BACKUP_COUNT file)"
+    echo -e "  Cek isi      : ls -lh /root/backups/"
+    echo -e "  Restore      : sudo bash /opt/wa-otp/scripts/db-restore.sh"
+    echo -e "  Hapus manual : sudo rm -f /root/backups/wa-otp-*.sql.gz   ${YELLOW}(kalau emang gak butuh)${NC}"
+    echo ""
+  fi
+fi
+
+echo -e "${YELLOW}Re-deploy fresh:${NC}"
+echo -e "  ${BLUE}curl -fsSL \"https://raw.githubusercontent.com/santricibiin/waweb/main/scripts/vps-deploy.sh?\$(date +%s)\" | sudo bash -s -- \\${NC}"
+echo -e "  ${BLUE}    --domain=DOMAIN --email=EMAIL --repo=https://github.com/santricibiin/waweb.git${NC}"
 echo ""

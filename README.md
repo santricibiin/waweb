@@ -149,8 +149,8 @@ ulang atau jalankan `source /etc/profile.d/wa-otp-aliases.sh`, lalu pakai:
 | `warestore` | Restore dari backup (interactive picker) |
 | `waenv` | Edit `.env` dengan nano |
 | `wassl-renew` / `wassl-status` | Manage SSL cert |
-| `wacleanup` | Hapus app/db/services (paket sistem dipertahankan) |
-| `wanuke` | Full uninstall (juga hapus MySQL, Nginx, dll) |
+| `wacleanup` | Cleanup standar (paket sistem dipertahankan) |
+| `wacleanup-hard` | Cleanup + hapus user + revoke SSL |
 | `waotp-help` | Tampilkan semua alias |
 
 **Cleanup / deploy ulang dari nol:**
@@ -158,21 +158,26 @@ ulang atau jalankan `source /etc/profile.d/wa-otp-aliases.sh`, lalu pakai:
 Kalau mau bersihkan instalasi (mis. mau deploy ulang fresh):
 
 ```bash
-# Cleanup standar - hapus app, db, services. Paket sistem tetap.
+# Standar - hapus app, db, services, nginx config, aliases
 sudo bash /opt/wa-otp/scripts/cleanup.sh
 
 # Skip konfirmasi
 sudo bash /opt/wa-otp/scripts/cleanup.sh --yes
 
+# Hapus juga user waotp
+sudo bash /opt/wa-otp/scripts/cleanup.sh --remove-user
+
 # Hapus juga SSL cert
-sudo bash /opt/wa-otp/scripts/cleanup.sh --remove-ssl
+sudo bash /opt/wa-otp/scripts/cleanup.sh --remove-ssl --domain=yourdomain.com
 
-# Hapus juga backup di /root/backups/
-sudo bash /opt/wa-otp/scripts/cleanup.sh --remove-backups
-
-# NUKE - uninstall MySQL, Nginx, Certbot, PM2, swap (Node.js TIDAK)
-sudo bash /opt/wa-otp/scripts/cleanup.sh --nuke
+# Cleanup paling agresif: + user + SSL
+sudo bash /opt/wa-otp/scripts/cleanup.sh --hard
 ```
+
+Cleanup script **TIDAK pernah uninstall paket sistem** (Node.js, MySQL,
+Nginx, Certbot, PM2). Itu disengaja supaya deploy ulang lebih cepat
+(tinggal `git clone + npm install + build`, paket sistem sudah ada).
+Backup di `/root/backups/` juga aman, tidak ikut dihapus.
 
 Setelah cleanup, jalankan ulang `vps-deploy.sh` untuk install fresh.
 
