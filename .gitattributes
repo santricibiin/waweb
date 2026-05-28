@@ -1,0 +1,28 @@
+# Force LF line endings for shell scripts (must be LF on Linux/VPS)
+*.sh        text eol=lf
+*.bash      text eol=lf
+
+# Force LF for files commonly run on servers
+Dockerfile  text eol=lf
+Makefile    text eol=lf
+
+# Source code: native (let Git decide)
+*.ts        text
+*.tsx       text
+*.js        text
+*.jsx       text
+*.json      text
+*.md        text
+*.css       text
+*.html      text
+*.svg       text
+*.prisma    text
+
+# Binary files
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.woff      binary
+*.woff2     binary
