@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Demo Login OTP - WA OTP Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --navy-50:#eef2fb;--navy-100:#d6deef;--navy-200:#aebcde;--navy-700:#152c5b;--navy-800:#0e1f44;--navy-900:#08152e;
+    --gold-300:#dfc05a;--gold-400:#d4a017;--gold-700:#6f4d08;
+    --cream-50:#fdfbf3;--cream-100:#f7f1de;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--cream-50);
+    background-image: url("/batik-light.svg");
+    background-size: 360px 360px;
+    background-attachment: fixed;
+    color: var(--navy-900);
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background: linear-gradient(180deg, rgba(253,251,243,.78), rgba(253,251,243,.92));
+    z-index: -1;
+  }
+  .display { font-family: "Playfair Display", Georgia, serif; letter-spacing: -0.02em; }
+
+  header.banner {
+    background-color: var(--navy-900);
+    background-image: url("/batik-dark.svg");
+    background-size: 220px 220px;
+    color: var(--cream-50);
+    border-bottom: 4px solid var(--gold-400);
+    padding: 28px 24px;
+  }
+  header.banner .inner {
+    max-width: 760px; margin: 0 auto;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header.banner .badge {
+    width: 44px; height: 44px; border-radius: 8px;
+    background: var(--gold-400); color: var(--navy-900);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 18px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  }
+  header.banner h1 { margin: 0; font-size: 22px; font-weight: 700; }
+  header.banner .sub { font-size: 13px; color: rgba(253,251,243,.75); margin-top: 2px; }
+
+  .wrap { max-width: 760px; margin: 32px auto 80px; padding: 0 24px; }
+  .pageTitle { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
+  .pageTitle h2 { margin: 0; font-size: 18px; color: var(--navy-700); font-weight: 600; }
+  .pageTitle .hint { font-size: 12px; color: rgba(15,23,42,.55); }
+
+  .card {
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(2px);
+    border: 1px solid var(--navy-100);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 20px -8px rgba(8,21,46,.15);
+  }
+  .step-head {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 16px;
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 700; font-size: 18px; color: var(--navy-900);
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--navy-900); color: var(--gold-300);
+    font-family: Inter, sans-serif; font-weight: 800; font-size: 13px;
+  }
+
+  .row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 200px; }
+  label {
+    display: block; font-size: 11px; font-weight: 700; color: var(--navy-700);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  input {
+    width: 100%; padding: 11px 14px;
+    border: 1px solid var(--navy-100); background: rgba(255,255,255,.85);
+    border-radius: 10px; font-size: 14px; font-family: inherit; color: var(--navy-900);
+    transition: border-color .2s, box-shadow .2s;
+  }
+  input:focus {
+    outline: none; border-color: var(--navy-700);
+    box-shadow: 0 0 0 3px rgba(30,58,114,.18);
+  }
+
+  button {
+    background: var(--navy-800); color: var(--cream-50);
+    border: 0; padding: 11px 20px; border-radius: 10px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: background .15s;
+  }
+  button:hover { background: var(--navy-700); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.gold { background: var(--gold-400); color: var(--navy-900); }
+  button.gold:hover { background: var(--gold-300); }
+  button.ghost { background: transparent; color: var(--navy-800); border: 1px solid var(--navy-100); }
+  button.ghost:hover { background: var(--navy-50); }
+
+  .muted { color: rgba(15,23,42,.6); font-size: 13px; }
+  a { color: var(--gold-700); text-decoration: none; font-weight: 600; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: var(--navy-900); color: var(--gold-300);
+    padding: 1px 6px; border-radius: 4px; font-size: 12px;
+  }
+
+  .ok {
+    background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46;
+    padding: 12px 14px; border-radius: 10px; font-size: 14px; margin-top: 12px;
+  }
+  .err {
+    background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b;
+    padding: 12px 14px; border-radius: 10px; font-size: 14px; margin-top: 12px;
+  }
+  pre {
+    background: var(--navy-900); color: var(--cream-50);
+    padding: 12px 14px; border-radius: 8px;
+    font-size: 12px; overflow-x: auto; margin: 8px 0 0;
+    border: 1px solid var(--navy-700);
+  }
+  details summary {
+    cursor: pointer; color: var(--navy-700); font-size: 12px;
+    user-select: none; font-weight: 600;
+  }
+  .hide { display: none; }
+  .pill {
+    display: inline-block; font-size: 11px; padding: 3px 10px;
+    border-radius: 999px; background: var(--gold-400); color: var(--navy-900);
+    font-weight: 700; margin-left: 8px; vertical-align: middle;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .nav-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: rgba(253,251,243,.85); font-size: 13px; margin-left: auto;
+  }
+  .nav-back:hover { color: var(--gold-300); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header class="banner">
+  <div class="inner">
+    <span class="badge">★</span>
+    <div style="flex:1">
+      <h1 class="display">Demo OTP via WhatsApp</h1>
+      <div class="sub">Halaman uji integrasi - mensimulasikan aplikasi pihak ketiga.</div>
+    </div>
+    <a href="/" class="nav-back">&larr; Kembali ke beranda</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="pageTitle">
+    <h2>Test end-to-end pengiriman &amp; verifikasi OTP</h2>
+    <span class="hint">Konfigurasi tersimpan otomatis di browser</span>
+  </div>
+
+  <div class="card">
+    <h3 class="step-head"><span class="step-num">1</span>Konfigurasi <span class="pill">step 1</span></h3>
+    <div class="row">
+      <div style="flex:2">
+        <label>API Base URL</label>
+        <input id="baseUrl" placeholder="http://localhost:3001/api/v1" />
+      </div>
+      <div style="flex:3">
+        <label>API Key (x-api-key)</label>
+        <input id="apiKey" placeholder="waotp_xxxxxxxx_xxxxxxxxxxxxxxxx" />
+      </div>
+    </div>
+    <p class="muted" style="margin: 12px 0 0">
+      Buat API key di <a href="/dashboard/api-keys" target="_blank">/dashboard/api-keys</a>.
+      Pastikan ada sesi WA yang <code>CONNECTED</code>.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3 class="step-head"><span class="step-num">2</span>Kirim OTP <span class="pill">step 2</span></h3>
+    <div class="row">
+      <div>
+        <label>Nomor WhatsApp</label>
+        <input id="phone" placeholder="08123456789" />
+      </div>
+      <div style="flex: 0 0 auto">
+        <button id="btnSend">Kirim OTP</button>
+      </div>
+    </div>
+    <p class="muted" style="margin: 12px 0 0">Kode 6 digit akan dikirim ke nomor di atas.</p>
+    <div id="sendResult"></div>
+  </div>
+
+  <div id="step3" class="card hide">
+    <h3 class="step-head"><span class="step-num">3</span>Verifikasi OTP <span class="pill">step 3</span></h3>
+    <div class="row">
+      <div>
+        <label>Kode OTP</label>
+        <input id="code" placeholder="123456" maxlength="8" />
+      </div>
+      <div style="flex: 0 0 auto">
+        <button id="btnVerify" class="gold">Verifikasi</button>
+      </div>
+    </div>
+    <div id="verifyResult"></div>
+  </div>
+
+  <div class="card">
+    <h3 class="step-head"><span class="step-num" style="background:var(--gold-700);color:var(--cream-50)">i</span>Cek status manual</h3>
+    <p class="muted" style="margin: 0 0 12px">Lihat detail request OTP terakhir.</p>
+    <button id="btnStatus" class="ghost">GET /otp/status/&#123;requestId&#125;</button>
+    <div id="statusResult"></div>
+  </div>
+</div>
+
+<script>
+  const defaultBase = location.origin + "/api/v1";
+  const $ = (id) => document.getElementById(id);
+
+  $("baseUrl").value = localStorage.getItem("waotp_base") || defaultBase;
+  $("apiKey").value = localStorage.getItem("waotp_key") || "";
+  $("phone").value = localStorage.getItem("waotp_phone") || "";
+
+  function save() {
+    localStorage.setItem("waotp_base", $("baseUrl").value.trim());
+    localStorage.setItem("waotp_key", $("apiKey").value.trim());
+    localStorage.setItem("waotp_phone", $("phone").value.trim());
+  }
+  ["baseUrl", "apiKey", "phone"].forEach((id) => $(id).addEventListener("change", save));
+
+  let lastRequestId = null;
+
+  function showResult(container, ok, message, raw) {
+    const cls = ok ? "ok" : "err";
+    const detail = raw
+      ? `<details style="margin-top:8px"><summary>Lihat raw response</summary><pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre></details>`
+      : "";
+    container.innerHTML = `<div class="${cls}">${escapeHtml(message)}${detail}</div>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+  }
+
+  async function callApi(method, path, body) {
+    const base = $("baseUrl").value.trim().replace(/\/+$/, "");
+    const key = $("apiKey").value.trim();
+    if (!key) throw new Error("API key kosong. Isi dulu di Step 1.");
+    const res = await fetch(base + path, {
+      method,
+      headers: { "x-api-key": key, "content-type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  $("btnSend").addEventListener("click", async () => {
+    save();
+    const phone = $("phone").value.trim();
+    if (!phone) return showResult($("sendResult"), false, "Nomor WhatsApp wajib diisi.");
+    $("btnSend").disabled = true;
+    $("sendResult").innerHTML = '<div class="muted" style="margin-top:10px">Mengirim...</div>';
+    try {
+      const r = await callApi("POST", "/otp/send", {
+        phone, purpose: "demo-login", expiresInSeconds: 300,
+      });
+      if (!r.ok) {
+        showResult($("sendResult"), false, "Gagal: " + (r.data.error || r.status), r.data);
+      } else {
+        lastRequestId = r.data.requestId;
+        showResult($("sendResult"), true,
+          `OTP terkirim ke ${r.data.phone}. requestId=${r.data.requestId}`, r.data);
+        $("step3").classList.remove("hide");
+        $("code").focus();
+      }
+    } catch (e) {
+      showResult($("sendResult"), false, e.message);
+    } finally {
+      $("btnSend").disabled = false;
+    }
+  });
+
+  $("btnVerify").addEventListener("click", async () => {
+    const code = $("code").value.trim();
+    if (!code) return showResult($("verifyResult"), false, "Kode OTP wajib diisi.");
+    $("btnVerify").disabled = true;
+    $("verifyResult").innerHTML = '<div class="muted" style="margin-top:10px">Memverifikasi...</div>';
+    try {
+      const r = await callApi("POST", "/otp/verify", {
+        requestId: lastRequestId, phone: $("phone").value.trim(), code,
+      });
+      if (!r.ok) {
+        showResult($("verifyResult"), false, "Gagal: " + (r.data.error || r.status), r.data);
+      } else {
+        showResult($("verifyResult"), true, "Verifikasi berhasil! User dianggap login.", r.data);
+      }
+    } catch (e) {
+      showResult($("verifyResult"), false, e.message);
+    } finally {
+      $("btnVerify").disabled = false;
+    }
+  });
+
+  $("btnStatus").addEventListener("click", async () => {
+    if (!lastRequestId)
+      return showResult($("statusResult"), false, "Belum ada requestId. Kirim OTP dulu.");
+    try {
+      const r = await callApi("GET", "/otp/status/" + lastRequestId);
+      if (!r.ok) showResult($("statusResult"), false, "Gagal: " + (r.data.error || r.status), r.data);
+      else showResult($("statusResult"), true, "Status: " + r.data.request.status, r.data);
+    } catch (e) {
+      showResult($("statusResult"), false, e.message);
+    }
+  });
+</script>
+</body>
+</html>

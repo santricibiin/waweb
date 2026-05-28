@@ -1,0 +1,101 @@
+// Prisma schema for WA OTP Platform
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apiKeys     ApiKey[]
+  waSessions  WaSession[]
+  otpRequests OtpRequest[]
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  key        String    @unique
+  prefix     String
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpRequests OtpRequest[]
+
+  @@index([userId])
+}
+
+model WaSession {
+  id          String          @id @default(cuid())
+  userId      String
+  name        String
+  status      WaSessionStatus @default(DISCONNECTED)
+  phoneNumber String?
+  lastQrAt    DateTime?
+  connectedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpRequests OtpRequest[]
+
+  @@index([userId])
+}
+
+enum WaSessionStatus {
+  DISCONNECTED
+  CONNECTING
+  QR
+  CONNECTED
+  LOGGED_OUT
+}
+
+model OtpRequest {
+  id          String        @id @default(cuid())
+  userId      String
+  apiKeyId    String?
+  waSessionId String?
+  phone       String
+  code        String
+  hashedCode  String
+  purpose     String?
+  status      OtpStatus     @default(PENDING)
+  attempts    Int           @default(0)
+  maxAttempts Int           @default(5)
+  expiresAt   DateTime
+  verifiedAt  DateTime?
+  sentAt      DateTime?
+  failedAt    DateTime?
+  errorMsg    String?       @db.Text
+  createdAt   DateTime      @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKey     ApiKey?    @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  waSession  WaSession? @relation(fields: [waSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([phone])
+  @@index([status])
+}
+
+enum OtpStatus {
+  PENDING
+  SENT
+  VERIFIED
+  EXPIRED
+  FAILED
+}

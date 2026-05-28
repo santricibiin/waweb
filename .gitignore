@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Next.js
+.next/
+**/.next/
+out/
+
+# Build artifacts
+dist/
+build/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# WhatsApp auth (contains login tokens)
+auth-sessions/
+**/auth-sessions/
+
+# Logs
+*.log
+dev.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Prisma
+**/prisma/migrations/dev.db*
+
+# Reference (not part of project)
+/vps-deploy.sh

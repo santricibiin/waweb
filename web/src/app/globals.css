@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* Hide scrollbar (works in Firefox, Chromium, Safari) */
+html {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE/Edge */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+*::-webkit-scrollbar { width: 0; height: 0; }
+* { scrollbar-width: none; }
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  background-color: #fdfbf3;
+  background-image: url("/batik-light.svg");
+  background-size: 360px 360px;
+  background-attachment: fixed;
+  color: #08152e;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
+}
+
+/* Soft veil over batik so content stays readable */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(253, 251, 243, 0.78), rgba(253, 251, 243, 0.92));
+  z-index: -1;
+  pointer-events: none;
+}
+
+@layer components {
+  .h-display {
+    font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply btn bg-navy-800 text-cream-50 hover:bg-navy-700 focus:ring-navy-500 shadow-soft;
+  }
+  .btn-gold {
+    @apply btn bg-gold-400 text-navy-900 hover:bg-gold-300 focus:ring-gold-500 shadow-soft;
+  }
+  .btn-outline {
+    @apply btn border border-navy-800 text-navy-800 hover:bg-navy-800 hover:text-cream-50 focus:ring-navy-500;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-navy-800 hover:bg-navy-100 focus:ring-navy-300;
+  }
+  .btn-danger {
+    @apply btn bg-red-700 text-white hover:bg-red-800 focus:ring-red-600;
+  }
+
+  /* Form */
+  .input {
+    @apply block w-full rounded-lg border border-navy-200 bg-white/85 px-3.5 py-2.5 text-sm shadow-sm placeholder:text-navy-300 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-500/30;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-navy-700;
+  }
+
+  /* Card */
+  .card {
+    @apply relative rounded-xl border border-navy-100 bg-white/90 p-6 shadow-soft backdrop-blur-sm;
+  }
+  .card-dark {
+    @apply relative rounded-xl border border-navy-700 bg-navy-900/95 p-6 text-cream-50 shadow-navy-glow;
+  }
+
+  /* Code */
+  .code {
+    @apply rounded bg-navy-900 px-1.5 py-0.5 font-mono text-xs text-gold-200;
+  }
+  pre.codeblock {
+    @apply overflow-x-auto rounded-lg border border-navy-700 bg-navy-950 p-4 font-mono text-xs leading-relaxed text-cream-50 shadow-navy-glow;
+  }
+  pre.codeblock-light {
+    @apply overflow-x-auto rounded-lg border border-navy-100 bg-white p-4 font-mono text-xs leading-relaxed text-navy-900 shadow-soft;
+  }
+
+  /* Decorative gold underline */
+  .gold-line {
+    @apply relative inline-block;
+  }
+  .gold-line::after {
+    content: "";
+    @apply absolute -bottom-1 left-0 h-1 w-full rounded bg-gold-400 opacity-80;
+  }
+
+  /* Section accent panels */
+  .panel-batik {
+    background-image: url("/batik-light.svg");
+    background-size: 220px 220px;
+  }
+  .panel-batik-dark {
+    background-image: url("/batik-dark.svg");
+    background-size: 220px 220px;
+  }
+}
+
+/* Status pills */
+.pill {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+.pill-success { @apply bg-emerald-100 text-emerald-800; }
+.pill-warn { @apply bg-amber-100 text-amber-800; }
+.pill-info { @apply bg-sky-100 text-sky-800; }
+.pill-danger { @apply bg-red-100 text-red-800; }
+.pill-mute { @apply bg-navy-100 text-navy-700; }
+
+/* Required field indicator */
+.req::after {
+  content: " *";
+  color: #b78210;
+  font-weight: 700;
+}

@@ -1,0 +1,20 @@
+{
+  "name": "wa-otp-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WhatsApp OTP Platform - Next.js + Baileys + Prisma",
+  "scripts": {
+    "install:all": "npm install && npm --prefix web install && npm --prefix wa-worker install",
+    "prisma:generate": "npm --prefix web run prisma -- generate",
+    "prisma:migrate": "npm --prefix web run prisma -- migrate dev",
+    "prisma:studio": "npm --prefix web run prisma -- studio",
+    "dev:web": "npm --prefix web run dev",
+    "dev:worker": "npm --prefix wa-worker run dev",
+    "dev": "concurrently -n web,worker -c blue,green \"npm:dev:web\" \"npm:dev:worker\"",
+    "start:web": "npm --prefix web run start",
+    "start:worker": "npm --prefix wa-worker run start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

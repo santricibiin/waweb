@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220">
+  <defs>
+    <pattern id="batik" x="0" y="0" width="220" height="220" patternUnits="userSpaceOnUse">
+      <rect width="220" height="220" fill="#fdfbf3"/>
+      <g fill="none" stroke="#1e3a72" stroke-width="1" opacity="0.18">
+        <!-- Big medallion -->
+        <circle cx="110" cy="110" r="78"/>
+        <circle cx="110" cy="110" r="60"/>
+        <circle cx="110" cy="110" r="44"/>
+        <!-- petals around medallion -->
+        <g>
+          <path d="M110 32 Q126 60 110 88 Q94 60 110 32 Z"/>
+          <path d="M188 110 Q160 126 132 110 Q160 94 188 110 Z"/>
+          <path d="M110 188 Q126 160 110 132 Q94 160 110 188 Z"/>
+          <path d="M32 110 Q60 126 88 110 Q60 94 32 110 Z"/>
+          <path d="M55 55 Q86 70 86 86 Q70 86 55 55 Z"/>
+          <path d="M165 55 Q150 86 134 86 Q134 70 165 55 Z"/>
+          <path d="M165 165 Q134 150 134 134 Q150 134 165 165 Z"/>
+          <path d="M55 165 Q70 134 86 134 Q86 150 55 165 Z"/>
+        </g>
+        <!-- inner decoration -->
+        <g stroke="#b78210" opacity="0.7">
+          <circle cx="110" cy="110" r="14"/>
+          <circle cx="110" cy="110" r="6"/>
+          <path d="M110 96 V124 M96 110 H124"/>
+        </g>
+        <!-- corner motifs (parang) -->
+        <g>
+          <path d="M0 0 Q30 20 0 40 Q-15 20 0 0 Z"/>
+          <path d="M220 0 Q190 20 220 40 Q235 20 220 0 Z"/>
+          <path d="M0 220 Q30 200 0 180 Q-15 200 0 220 Z"/>
+          <path d="M220 220 Q190 200 220 180 Q235 200 220 220 Z"/>
+        </g>
+        <!-- small dots -->
+        <g fill="#1e3a72" stroke="none">
+          <circle cx="110" cy="22" r="1.5"/>
+          <circle cx="110" cy="198" r="1.5"/>
+          <circle cx="22" cy="110" r="1.5"/>
+          <circle cx="198" cy="110" r="1.5"/>
+          <circle cx="40" cy="40" r="1.2"/>
+          <circle cx="180" cy="40" r="1.2"/>
+          <circle cx="40" cy="180" r="1.2"/>
+          <circle cx="180" cy="180" r="1.2"/>
+        </g>
+      </g>
+    </pattern>
+  </defs>
+  <rect width="220" height="220" fill="url(#batik)"/>
+</svg>
