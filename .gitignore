@@ -23,7 +23,7 @@ auth-sessions/
 # Logs
 *.log
 dev.log
-logs/
+/logs/
 
 # OS
 .DS_Store
