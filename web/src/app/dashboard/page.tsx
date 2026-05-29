@@ -39,8 +39,8 @@ export default async function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Stat label="API Keys aktif" value={apiKeyCount} href="/dashboard/api-keys" icon="key" />
         <Stat label="Sesi WhatsApp" value={sessionCount} href="/dashboard/wa-sessions" icon="wa" />
-        <Stat label="Template pesan" value={templateCount} href="/dashboard/templates" icon="paper" />
-        <Stat label="Berhasil verify" value={`${successRate}%`} icon="check" hint={`${otpVerified} / ${otpCount}`} />
+        <Stat label="Total OTP" value={otpCount} href="/dashboard/logs" icon="paper" />
+        <Stat label="Berhasil verify" value={`${successRate}%`} href="/dashboard/logs" icon="check" hint={`${otpVerified} / ${otpCount}`} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
